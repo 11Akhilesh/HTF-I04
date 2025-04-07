@@ -1,182 +1,109 @@
 import requests
-import heapq
-import math
 import time
-import re
+import math
 
-# === Utility Functions ===
+# === Constants ===
+TRUCK_CAPACITY_KG = 10000  # assumed
+TRUCK_VOLUME_CUBIC_M = 60  # assumed
+
+FUEL_COST_PER_KM = 7.5      # INR/km
+LABOUR_COST = 500           # INR (fixed)
+LOADING_COST = 300          # INR
+UNLOADING_COST = 300        # INR
+AVG_CO2_PER_KM = 0.31       # kg CO2/km
+AVG_SPEED_KMPH = 50
+
+API_KEY = "AIzaSyDzggQCozVlD6dhbw5JJYi5YC6YWT_25FU"  # replace with your actual API key
+
+# === Helper Functions ===
 def haversine_distance(coord1, coord2):
-    R = 6371e3  # Earth radius in meters
+    R = 6371e3
     lat1, lon1 = coord1
     lat2, lon2 = coord2
     phi1 = math.radians(lat1)
     phi2 = math.radians(lat2)
-    delta_phi = math.radians(lat2 - lat1)
-    delta_lambda = math.radians(lon2 - lon1)
+    d_phi = math.radians(lat2 - lat1)
+    d_lambda = math.radians(lon2 - lon1)
 
-    a = math.sin(delta_phi / 2)**2 + \
-        math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2)**2
+    a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
 
-def reverse_geocode(lat, lng, api_key):
-    url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={api_key}"
+    return R * c / 1000  # return in km
+
+def get_location_name(lat, lng):
+    url = f"https://maps.googleapis.com/maps/api/geocode/json?latlng={lat},{lng}&key={API_KEY}"
     response = requests.get(url)
     data = response.json()
-
     if data["status"] == "OK" and data["results"]:
-        components = data["results"][0].get("address_components", [])
-        city = ""
-        highway = ""
-        for comp in components:
-            if "route" in comp["types"]:
-                if "NH" in comp["long_name"] or "SH" in comp["long_name"] or "Highway" in comp["long_name"]:
-                    highway = comp["long_name"]
+        for comp in data["results"][0]["address_components"]:
             if "locality" in comp["types"] or "administrative_area_level_2" in comp["types"]:
-                city = comp["long_name"]
-        result = []
-        if highway:
-            result.append(highway)
-        if city:
-            result.append(city)
-        return " - ".join(result) if result else city or highway
-    else:
-        return f"{lat:.4f}, {lng:.4f}"
+                return comp["long_name"]
+    return f"{lat:.2f},{lng:.2f}"
 
-def fetch_routes_data(source, destination, api_key):
-    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={source}&destination={destination}&alternatives=true&departure_time=now&key={api_key}"
-    response = requests.get(url)
-    data = response.json()
+def fetch_routes(source, destination):
+    url = f"https://maps.googleapis.com/maps/api/directions/json?origin={source}&destination={destination}&alternatives=false&key={API_KEY}"
+    res = requests.get(url)
+    return res.json()
 
-    if data["status"] != "OK":
-        print("Error from Google Maps API:", data["status"])
-        return []
+# === Main Function ===
+def main():
+    source = input("Enter source location: ")
+    destination = input("Enter destination location: ")
 
-    return data["routes"]
+    response = fetch_routes(source, destination)
+    if response["status"] != "OK":
+        print("Error from API:", response["status"])
+        return
 
-def build_graph_from_steps(steps):
-    graph = {}
-    coords = []
+    leg = response["routes"][0]["legs"][0]
+    steps = leg["steps"]
 
+    major_nodes = []
     for step in steps:
-        start = (step["start_location"]["lat"], step["start_location"]["lng"])
-        end = (step["end_location"]["lat"], step["end_location"]["lng"])
-        distance = step["distance"]["value"]
+        lat = step["start_location"]["lat"]
+        lng = step["start_location"]["lng"]
+        name = get_location_name(lat, lng)
+        if name not in major_nodes:
+            major_nodes.append(name)
+        time.sleep(0.1)  # To avoid API rate limit
 
-        coords.append(start)
-        coords.append(end)
+    # Add final point
+    end_lat = steps[-1]["end_location"]["lat"]
+    end_lng = steps[-1]["end_location"]["lng"]
+    end_name = get_location_name(end_lat, end_lng)
+    if end_name not in major_nodes:
+        major_nodes.append(end_name)
 
-        if start not in graph:
-            graph[start] = []
-        graph[start].append((end, distance))
+    output_segments = []
 
-    return graph, coords[0], coords[-1]
+    for i in range(len(major_nodes) - 1):
+        from_node = major_nodes[i]
+        to_node = major_nodes[i + 1]
 
-def a_star(graph, start, end):
-    open_set = [(0 + haversine_distance(start, end), 0, start)]
-    came_from = {}
-    g_score = {start: 0}
+        # Estimate distance and duration
+        dist_km = haversine_distance(
+            (steps[i]["start_location"]["lat"], steps[i]["start_location"]["lng"]),
+            (steps[i]["end_location"]["lat"], steps[i]["end_location"]["lng"])
+        )
+        duration_hr = dist_km / AVG_SPEED_KMPH
+        cost = LABOUR_COST + LOADING_COST + UNLOADING_COST + (FUEL_COST_PER_KM * dist_km)
+        emissions = AVG_CO2_PER_KM * dist_km
 
-    while open_set:
-        _, current_cost, current = heapq.heappop(open_set)
+        segment = {
+            "mode": "road",
+            "from": from_node,
+            "to": to_node,
+            "distance_km": round(dist_km, 2),
+            "duration_hr": round(duration_hr, 2),
+            "cost_inr": round(cost, 2),
+            "emissions_kg": round(emissions, 2),
+            "source_model": "road"
+        }
+        output_segments.append(segment)
 
-        if current == end:
-            path = []
-            while current in came_from:
-                path.append(current)
-                current = came_from[current]
-            path.append(start)
-            return path[::-1], g_score[end]
+    print("\n🚀 Final Optimized Output:")
+    import json
+    print(json.dumps(output_segments, indent=2))
 
-        for neighbor, weight in graph.get(current, []):
-            tentative_g = current_cost + weight
-            if neighbor not in g_score or tentative_g < g_score[neighbor]:
-                g_score[neighbor] = tentative_g
-                f_score = tentative_g + haversine_distance(neighbor, end)
-                heapq.heappush(open_set, (f_score, tentative_g, neighbor))
-                came_from[neighbor] = current
-
-    return [], float('inf')
-
-def is_major_checkpoint(place_name):
-    return (
-        "NH" in place_name or
-        "SH" in place_name or
-        "Highway" in place_name
-    )
-
-def display_route_summary(route_data, route_number, checkpoints, api_key):
-    leg = route_data["legs"][0]
-    summary = route_data.get("summary", "Unnamed Route")
-    distance = leg["distance"]["text"]
-    duration = leg["duration"]["text"]
-    traffic_time = leg.get("duration_in_traffic", {}).get("text", duration)
-
-    print(f"\n🚚 Route {route_number + 1}: {summary}")
-    print(f"   Total Distance: {distance}")
-    print(f"   Estimated Duration: {duration} (with traffic: {traffic_time})")
-    print("   🛑 Major Checkpoints (NH, SH + City):")
-
-    shown_places = set()
-    major_city = None
-    displayed = 0
-
-    for i, (lat, lng) in enumerate(checkpoints):
-        if displayed >= 25:
-            break
-
-        place = reverse_geocode(lat, lng, api_key)
-        if is_major_checkpoint(place) and place not in shown_places:
-            print(f"     {displayed + 1}. {place}")
-            shown_places.add(place)
-            if not major_city:
-                major_city = place
-            displayed += 1
-            time.sleep(0.1)
-
-    return {
-        "summary": summary,
-        "distance": leg["distance"]["value"],
-        "distance_text": distance,
-        "duration": duration,
-        "traffic_time": traffic_time,
-        "major_city": major_city or "N/A"
-    }
-
-# === MAIN ===
 if __name__ == "__main__":
-    print("\n🔽 Route Optimizer 🔽")
-    source = input("Enter source location (e.g., Bangalore): ")
-    destination = input("Enter destination location (e.g., Mumbai): ")
-    api_key = "AIzaSyDzggQCozVlD6dhbw5JJYi5YC6YWT_25FU"  # Replace with your actual Google Maps API key
-
-    routes = fetch_routes_data(source, destination, api_key)
-    if not routes:
-        print("❌ No routes found. Exiting.")
-        exit()
-
-    print(f"\n✅ Found {len(routes)} route(s) from {source} to {destination}.")
-
-    route_infos = []
-
-    for i, route in enumerate(routes):
-        steps = route["legs"][0]["steps"]
-        graph, start_node, end_node = build_graph_from_steps(steps)
-        path, total_distance = a_star(graph, start_node, end_node)
-        info = display_route_summary(route, i, path, api_key)
-        info["route_index"] = i
-        route_infos.append(info)
-
-    # Sort and select best route (shortest distance)
-    best = min(route_infos, key=lambda x: x["distance"])
-
-    print("\n📍 Final Optimized Route Selection:")
-    print("===================================")
-    print(f"✔️  Best Route: Route {best['route_index'] + 1} - {best['summary']}")
-    print(f"📌 Source: {source}")
-    print(f"📌 Destination: {destination}")
-    print(f"🏙️  Major Checkpoint (first city/highway): {best['major_city']}")
-    print(f"📏 Distance: {best['distance_text']}")
-    print(f"⏱️  Estimated Duration: {best['traffic_time']}")
-    print("===================================")
-   
+    main()
