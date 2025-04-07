@@ -1,6 +1,7 @@
 import googlemaps
 import math
 from geopy.distance import geodesic
+import json
 
 # === ✅ Your Google Maps API Key ===
 API_KEY = "AIzaSyBlC9_QicFifEy84f-XqgkKQ2IjyLFMYaM"
@@ -38,14 +39,12 @@ port_address_map = {
     "Haldia": "Haldia Port, West Bengal"
 }
 
-
 # === 🔍 Get Lat/Lng of a Location ===
 def get_lat_lng(place):
     geocode_result = gmaps.geocode(place)
     if not geocode_result:
         raise Exception(f"Could not find location: {place}")
     return geocode_result[0]["geometry"]["location"]["lat"], geocode_result[0]["geometry"]["location"]["lng"]
-
 
 # === 📏 Find Nearest Port ===
 def find_nearest_port(lat, lng):
@@ -57,7 +56,6 @@ def find_nearest_port(lat, lng):
             min_dist = dist
             nearest = port
     return nearest
-
 
 # === 🚗 Get Road Distance Using Distance Matrix API ===
 def get_road_distance(origin, destination):
@@ -71,52 +69,95 @@ def get_road_distance(origin, destination):
         print("⚠️ Distance Matrix API error:", result)
         raise Exception("Invalid route. Check input or API limits.")
 
-
 # === 🚢 Estimate Sea Distance (great-circle) ===
 def sea_distance(from_port, to_port):
     return geodesic(ports[from_port], ports[to_port]).km
 
-
 # === 🧠 Route Planner ===
 def plan_route(source, destination):
-    print(f"\n🔍 Calculating route from {source} to {destination}...\n")
+    print(f"\n🔍 Calculating hybrid sea-based route from {source} to {destination}...\n")
 
-    # Get coordinates
-    src_lat, src_lng = get_lat_lng(source)
-    dst_lat, dst_lng = get_lat_lng(destination)
+    try:
+        # Get coordinates
+        src_lat, src_lng = get_lat_lng(source)
+        dst_lat, dst_lng = get_lat_lng(destination)
 
-    # Nearest ports
-    src_port = find_nearest_port(src_lat, src_lng)
-    dst_port = find_nearest_port(dst_lat, dst_lng)
+        # Nearest ports
+        src_port = find_nearest_port(src_lat, src_lng)
+        dst_port = find_nearest_port(dst_lat, dst_lng)
 
-    # Road to first port
-    road_to_port_km, time_to_port_hr = get_road_distance(source, port_address_map[src_port])
+        if src_port == dst_port:
+            print("⚠️ Sea route not applicable (same source and destination port).")
+            return None
 
-    # Sea distance
-    sea_km = sea_distance(src_port, dst_port)
-    sea_speed_kmph = 37  # avg cargo ship ~20 knots
-    sea_time_hr = sea_km / sea_speed_kmph
+        # Road distances
+        road_to_port_km, time_to_port_hr = get_road_distance(source, port_address_map[src_port])
+        road_from_port_km, time_from_port_hr = get_road_distance(port_address_map[dst_port], destination)
 
-    # Road from last port
-    road_from_port_km, time_from_port_hr = get_road_distance(port_address_map[dst_port], destination)
+        # Sea distance and time
+        sea_km = sea_distance(src_port, dst_port)
+        sea_speed_kmph = 37
+        sea_time_hr = sea_km / sea_speed_kmph
 
-    # === 📦 Final Output ===
-    print("🧭 Route Summary:")
-    print(f"  🛣  Road: {source} → {src_port} Port = {road_to_port_km:.2f} km ({time_to_port_hr:.2f} hrs)")
-    print(f"  🚢  Sea: {src_port} Port → {dst_port} Port = {sea_km:.2f} km ({sea_time_hr:.2f} hrs)")
-    print(f"  🛣  Road: {dst_port} Port → {destination} = {road_from_port_km:.2f} km ({time_from_port_hr:.2f} hrs)")
+        # Cost & emissions (dummy values)
+        road_cost_per_km = 5
+        sea_cost_per_km = 2
+        road_emission_per_km = 0.15
+        sea_emission_per_km = 0.05
 
-    total_dist = road_to_port_km + sea_km + road_from_port_km
-    total_time = time_to_port_hr + sea_time_hr + time_from_port_hr
+        segments = []
 
-    print("\n🌊 Full Route:")
-    print(f"{source} → {src_port} → {dst_port} → {destination}")
-    print(f"\n📏 Total Distance: {total_dist:.2f} km")
-    print(f"⏱ Estimated Time: {total_time:.2f} hours")
+        segments.append({
+            "mode": "road",
+            "from": source,
+            "to": f"{src_port} Port",
+            "distance_km": round(road_to_port_km, 2),
+            "duration_hr": round(time_to_port_hr, 2),
+            "cost_inr": round(road_to_port_km * road_cost_per_km, 2),
+            "emissions_kg": round(road_to_port_km * road_emission_per_km, 2),
+            "capacity_ok": True,
+            "source_model": "sea"
+        })
 
+        segments.append({
+            "mode": "sea",
+            "from": f"{src_port} Port",
+            "to": f"{dst_port} Port",
+            "distance_km": round(sea_km, 2),
+            "duration_hr": round(sea_time_hr, 2),
+            "cost_inr": round(sea_km * sea_cost_per_km, 2),
+            "emissions_kg": round(sea_km * sea_emission_per_km, 2),
+            "capacity_ok": True,
+            "source_model": "sea"
+        })
+
+        segments.append({
+            "mode": "road",
+            "from": f"{dst_port} Port",
+            "to": destination,
+            "distance_km": round(road_from_port_km, 2),
+            "duration_hr": round(time_from_port_hr, 2),
+            "cost_inr": round(road_from_port_km * road_cost_per_km, 2),
+            "emissions_kg": round(road_from_port_km * road_emission_per_km, 2),
+            "capacity_ok": True,
+            "source_model": "sea"
+        })
+
+        return segments
+
+    except Exception as e:
+        print(f"❌ Route calculation failed: {e}")
+        return None
 
 # === 🚀 Run It ===
 if __name__ == "__main__":
     src = input("Enter Source Location: ")
     dst = input("Enter Destination Location: ")
-    plan_route(src, dst)
+
+    result = plan_route(src, dst)
+
+    if result is None:
+        print("🚫 No valid multi-modal route found.")
+    else:
+        print("\n✅ Final Route Segments (JSON):")
+        print(json.dumps(result, indent=4))
