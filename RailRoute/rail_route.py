@@ -51,6 +51,69 @@ def estimate_rail_data(from_coords, to_coords):
     emissions_kg = round(distance_km * 0.07, 2)
     return distance_km, duration_hr, cost_inr, emissions_kg
 
+def get_rail_route(source, destination):
+    src_addr, src_coords = geocode_location(source)
+    dst_addr, dst_coords = geocode_location(destination)
+
+    if not src_coords or not dst_coords:
+        return None
+
+    nearest_src_jn = get_nearest_junction(src_coords)
+    nearest_dst_jn = get_nearest_junction(dst_coords)
+
+    segments = []
+
+    # Road segment: source → source junction
+    if source.lower() != nearest_src_jn["name"].lower():
+        road1 = fetch_route(source, nearest_src_jn["name"])
+        if road1:
+            segments.append({
+                "mode": "road",
+                "from": road1["from"],
+                "to": road1["to"],
+                "distance_km": round(road1["distance_km"], 2),
+                "duration_hr": road1["duration_hr"],
+                "cost_inr": round(road1["distance_km"] * 3, 2),
+                "emissions_kg": round(road1["distance_km"] * 0.21, 2),
+                "capacity_ok": True,
+                "source_model": "rail"
+            })
+
+    # Rail segment: source junction → destination junction
+    rail_distance, rail_duration, rail_cost, rail_emissions = estimate_rail_data(
+        (nearest_src_jn["lat"], nearest_src_jn["lng"]),
+        (nearest_dst_jn["lat"], nearest_dst_jn["lng"])
+    )
+    segments.append({
+        "mode": "rail",
+        "from": nearest_src_jn["name"],
+        "to": nearest_dst_jn["name"],
+        "distance_km": round(rail_distance, 2),
+        "duration_hr": rail_duration,
+        "cost_inr": rail_cost,
+        "emissions_kg": rail_emissions,
+        "capacity_ok": True,
+        "source_model": "rail"
+    })
+
+    # Road segment: destination junction → destination
+    if destination.lower() != nearest_dst_jn["name"].lower():
+        road2 = fetch_route(nearest_dst_jn["name"], destination)
+        if road2:
+            segments.append({
+                "mode": "road",
+                "from": road2["from"],
+                "to": road2["to"],
+                "distance_km": round(road2["distance_km"], 2),
+                "duration_hr": road2["duration_hr"],
+                "cost_inr": round(road2["distance_km"] * 3, 2),
+                "emissions_kg": round(road2["distance_km"] * 0.21, 2),
+                "capacity_ok": True,
+                "source_model": "rail"
+            })
+
+    return segments
+
 def main():
     print("🚆 Rail Route Finder with Freight Junctions (Segment Format)")
     src_input = input("Enter Start Location: ")

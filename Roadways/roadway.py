@@ -45,6 +45,61 @@ def fetch_routes(source, destination):
     res = requests.get(url)
     return res.json()
 
+# === Get Road Route ===
+def get_road_route(source, destination):
+    response = fetch_routes(source, destination)
+    if response["status"] != "OK":
+        raise Exception(f"Error from API: {response['status']}")
+
+    leg = response["routes"][0]["legs"][0]
+    steps = leg["steps"]
+
+    major_nodes = []
+    for step in steps:
+        lat = step["start_location"]["lat"]
+        lng = step["start_location"]["lng"]
+        name = get_location_name(lat, lng)
+        if name not in major_nodes:
+            major_nodes.append(name)
+        time.sleep(0.1)  # To avoid API rate limit
+
+    # Add final point
+    end_lat = steps[-1]["end_location"]["lat"]
+    end_lng = steps[-1]["end_location"]["lng"]
+    end_name = get_location_name(end_lat, end_lng)
+    if end_name not in major_nodes:
+        major_nodes.append(end_name)
+
+    output_segments = []
+
+    for i in range(len(major_nodes) - 1):
+        from_node = major_nodes[i]
+        to_node = major_nodes[i + 1]
+
+        # Estimate distance and duration
+        dist_km = haversine_distance(
+            (steps[i]["start_location"]["lat"], steps[i]["start_location"]["lng"]),
+            (steps[i]["end_location"]["lat"], steps[i]["end_location"]["lng"])
+        )
+        duration_hr = dist_km / AVG_SPEED_KMPH
+        cost = LABOUR_COST + LOADING_COST + UNLOADING_COST + (FUEL_COST_PER_KM * dist_km)
+        emissions = AVG_CO2_PER_KM * dist_km
+
+        segment = {
+            "mode": "road",
+            "from": from_node,
+            "to": to_node,
+            "distance_km": round(dist_km, 2),
+            "duration_hr": round(duration_hr, 2),
+            "cost_inr": round(cost, 2),
+            "emissions_kg": round(emissions, 2),
+            "capacity_ok": True,  # Added this field
+            "source_model": "road"
+        }
+        output_segments.append(segment)
+
+    return output_segments
+
 # === Main Function ===
 def main():
     source = input("Enter source location: ")

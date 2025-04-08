@@ -149,6 +149,76 @@ def plan_route(source, destination):
         print(f"❌ Route calculation failed: {e}")
         return None
 
+def get_sea_route(source, destination):
+    try:
+        # Get coordinates
+        src_lat, src_lng = get_lat_lng(source)
+        dst_lat, dst_lng = get_lat_lng(destination)
+
+        # Nearest ports
+        src_port = find_nearest_port(src_lat, src_lng)
+        dst_port = find_nearest_port(dst_lat, dst_lng)
+
+        if src_port == dst_port:
+            return None
+
+        # Road to first port
+        road_to_port_km, time_to_port_hr = get_road_distance(source, port_address_map[src_port])
+
+        # Sea distance
+        sea_km = sea_distance(src_port, dst_port)
+        sea_speed_kmph = 37  # avg cargo ship ~20 knots
+        sea_time_hr = sea_km / sea_speed_kmph
+
+        # Road from last port
+        road_from_port_km, time_from_port_hr = get_road_distance(port_address_map[dst_port], destination)
+
+        segments = []
+
+        # Road to port segment
+        segments.append({
+            "mode": "road",
+            "from": source,
+            "to": f"{src_port} Port",
+            "distance_km": round(road_to_port_km, 2),
+            "duration_hr": round(time_to_port_hr, 2),
+            "cost_inr": round(road_to_port_km * 5, 2),
+            "emissions_kg": round(road_to_port_km * 0.15, 2),
+            "capacity_ok": True,
+            "source_model": "sea"
+        })
+
+        # Sea segment
+        segments.append({
+            "mode": "sea",
+            "from": f"{src_port} Port",
+            "to": f"{dst_port} Port",
+            "distance_km": round(sea_km, 2),
+            "duration_hr": round(sea_time_hr, 2),
+            "cost_inr": round(sea_km * 2, 2),
+            "emissions_kg": round(sea_km * 0.05, 2),
+            "capacity_ok": True,
+            "source_model": "sea"
+        })
+
+        # Road from port segment
+        segments.append({
+            "mode": "road",
+            "from": f"{dst_port} Port",
+            "to": destination,
+            "distance_km": round(road_from_port_km, 2),
+            "duration_hr": round(time_from_port_hr, 2),
+            "cost_inr": round(road_from_port_km * 5, 2),
+            "emissions_kg": round(road_from_port_km * 0.15, 2),
+            "capacity_ok": True,
+            "source_model": "sea"
+        })
+
+        return segments
+    except Exception as e:
+        print(f"❌ Sea route error: {e}")
+        return None
+
 # === 🚀 Run It ===
 if __name__ == "__main__":
     src = input("Enter Source Location: ")

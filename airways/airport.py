@@ -98,6 +98,7 @@ def plan_air_route(source_place, destination_place):
             "duration_hr": round(road1_hr, 2),
             "cost_inr": int(road1_cost),
             "emissions_kg": round(road1_emissions, 2),
+            "capacity_ok": True,
             "source_model": "air"
         },
         {
@@ -108,6 +109,7 @@ def plan_air_route(source_place, destination_place):
             "duration_hr": round(air_time_hr, 2),
             "cost_inr": int(air_cost),
             "emissions_kg": round(air_emissions, 2),
+            "capacity_ok": True,
             "source_model": "air"
         },
         {
@@ -118,11 +120,16 @@ def plan_air_route(source_place, destination_place):
             "duration_hr": round(road2_hr, 2),
             "cost_inr": int(road2_cost),
             "emissions_kg": round(road2_emissions, 2),
+            "capacity_ok": True,
             "source_model": "air"
         }
     ]
 
     return route
+
+# Alias for consistency with other route functions
+def get_air_route(source, destination):
+    return plan_air_route(source, destination)
 
 # 🧪 Run the planner
 if __name__ == "__main__":
