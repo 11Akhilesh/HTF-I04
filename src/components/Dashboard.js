@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import Navbar from './Navbar';
 import '../App.css';
 import Loader from './Loader';
+import MapComponent from './MapComponent'; // if inside components folder
+
 
 function Dashboard() {
+  const [showMap, setShowMap] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [source, setSource] = useState('');
   const [destination, setDestination] = useState('');
@@ -84,12 +88,25 @@ function Dashboard() {
         ) : (
           <>
             {summary && (
+              <>
               <div style={styles.summaryCard}>
                 <h2>📦 Route Summary</h2>
                 <p><strong>Total Cost:</strong> ₹{summary.total_cost.toFixed(2)}</p>
                 <p><strong>Total Duration:</strong> {summary.total_duration.toFixed(1)} hrs</p>
                 <p><strong>Total Emissions:</strong> {summary.total_emissions.toFixed(2)} kg CO₂</p>
-              </div>
+              </div> <button style={styles.mapButton} onClick={() => setShowMap(true)}>
+      Visualize on Map
+    </button>
+    {showMap && (
+  <MapComponent 
+    source={source} 
+    destination={destination}
+    routeSegments={routeSegments}
+  />
+)}
+
+              </>
+              
             )}
 
             <div style={styles.results}>
@@ -122,8 +139,9 @@ const styles = {
   container: {
     minHeight: '100vh',
     background: 'linear-gradient(to bottom right, #0f172a, #1e293b)',
-    color: '#fff',
-    fontFamily: 'Segoe UI, sans-serif',
+    color: '#ffffff',
+    fontFamily: '"Segoe UI", sans-serif',
+    paddingBottom: '3rem',
   },
   content: {
     padding: '2rem',
@@ -131,49 +149,63 @@ const styles = {
   },
   heading: {
     fontSize: '2.5rem',
-    marginBottom: '1rem',
+    marginBottom: '1.5rem',
+    fontWeight: '600',
+    color: '#ffffff',
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
     gap: '1rem',
-    maxWidth: '400px',
+    maxWidth: '450px',
     margin: 'auto',
+    backgroundColor: '#bfcce0',
+    padding: '1.5rem',
+    borderRadius: '16px',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
   },
   input: {
-    padding: '0.75rem',
-    borderRadius: '8px',
-    border: 'none',
+    padding: '0.75rem 1rem',
+    borderRadius: '10px',
+    border: '1px solidrgb(201, 201, 201)',
     fontSize: '1rem',
+    backgroundColor: '#0f172a',
+    color: '#ffffff',
+    outline: 'none',
   },
   button: {
-    padding: '0.75rem',
+    padding: '0.75rem 1rem',
     backgroundColor: '#3b82f6',
-    color: '#fff',
+    color: '#ffffff',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     fontSize: '1rem',
     cursor: 'pointer',
+    transition: 'background-color 0.3s',
   },
   results: {
-    marginTop: '2rem',
+    marginTop: '2.5rem',
   },
   summaryCard: {
-    backgroundColor: '#0f172a',
-    padding: '1rem',
-    borderRadius: '12px',
-    margin: '1rem auto',
-    maxWidth: '500px',
-    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+    backgroundColor: '#1e293b',
+    padding: '1.5rem',
+    borderRadius: '16px',
+    margin: '1.5rem auto',
+    maxWidth: '550px',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
+    textAlign: 'left',
+    border: '1px solid rgb(231, 241, 255)',
   },
   routeCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: '12px',
-    padding: '1rem',
-    marginBottom: '1rem',
-    boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
-    maxWidth: '500px',
-    margin: '1rem auto',
+    backgroundColor: '#0f172a',
+    borderRadius: '16px',
+    padding: '1.25rem',
+    marginBottom: '1.5rem',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
+    maxWidth: '550px',
+    margin: '1.5rem auto',
+    textAlign: 'left',
+    border: '1px solid rgb(215, 232, 255)',
   },
 };
 
