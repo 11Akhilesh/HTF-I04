@@ -1,3 +1,30 @@
+/* App.css */
+
+/* Animation for fading in elements */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeInUp 1s ease-out forwards;
+}
+
+.fade-in-delay {
+  animation: fadeInUp 1.5s ease-out forwards;
+}
+
+.fade-in-more-delay {
+  animation: fadeInUp 2s ease-out forwards;
+}
+
+/* Existing App-specific styles */
 .App {
   text-align: center;
 }
@@ -35,4 +62,39 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* NAVBAR BUTTON STYLE (.button-35) */
+.button-35 {
+  align-items: center;
+  background-color: transparent;
+  border-radius: 12px;
+  box-shadow: transparent 0 0 0 3px, rgba(255, 255, 255, 0.1) 0 6px 20px;
+  box-sizing: border-box;
+  color: white;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 1 1 auto;
+  font-family: Inter, sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  justify-content: center;
+  line-height: 1;
+  margin: 0 0.5rem;
+  outline: none;
+  padding: 0.6rem 1rem;
+  text-align: center;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  white-space: nowrap;
+  border: 1px solid transparent;
+  user-select: none;
+  background-image: linear-gradient(145deg, #3a3a3a, #1f1f1f);
+}
+
+.button-35:hover {
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+  background-image: linear-gradient(145deg, #4a4a4a, #2a2a2a);
+  color: #38bdf8;
+  border-color: #38bdf8;
 }
