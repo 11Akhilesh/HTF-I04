@@ -1,12 +1,14 @@
 import googlemaps
 from geopy.distance import geodesic
-from pprint import pprint
+import json
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
 
-# 🔐 Google Maps API Key
+# Google Maps API Key
 API_KEY = "AIzaSyDzggQCozVlD6dhbw5JJYi5YC6YWT_25FU"  # Replace with your actual API key
 gmaps = googlemaps.Client(key=API_KEY)
 
-# ✈️ IATA to Airport Full Location Map
+#  IATA to Airport Full Location Map
 iata_to_location = {
     "DEL": "Indira Gandhi International Airport, Delhi",
     "HYD": "Rajiv Gandhi International Airport, Hyderabad",
@@ -27,15 +29,15 @@ iata_to_location = {
     "VGA": "Vijayawada International Airport, Vijayawada"
 }
 
-# 📍 Get Coordinates from Location
+#  Get Coordinates from Location
 def get_lat_lng(place):
     geocode_result = gmaps.geocode(place)
     if not geocode_result:
-        raise Exception(f"❌ Could not find location: {place}")
+        raise Exception(f" Could not find location: {place}")
     loc = geocode_result[0]["geometry"]["location"]
     return loc["lat"], loc["lng"]
 
-# 📏 Get Road Distance
+#  Get Road Distance
 def get_road_distance(origin, destination):
     result = gmaps.distance_matrix(origin, destination, mode="driving")
     try:
@@ -44,9 +46,9 @@ def get_road_distance(origin, destination):
         duration_hr = element["duration"]["value"] / 3600
         return dist_km, duration_hr
     except:
-        raise Exception(f"⚠️ Road distance error from {origin} to {destination}")
+        raise Exception(f" Road distance error from {origin} to {destination}")
 
-# 🔍 Find Nearest Airport to a Given Location
+#  Find Nearest Airport to a Given Location
 def find_nearest_airport(place):
     place_latlng = get_lat_lng(place)
     min_distance = float('inf')
@@ -61,20 +63,20 @@ def find_nearest_airport(place):
 
     return nearest_airport
 
-# 🧠 Route Planner (Road → Air → Road)
+#  Route Planner (Road → Air → Road)
 def plan_air_route(source_place, destination_place):
-    print(f"\n📦 Calculating Road + Air route from {source_place} to {destination_place}...\n")
+    print(f"\n Calculating Road + Air route from {source_place} to {destination_place}...\n")
 
-    # ✈️ Dynamically find nearest airports
+    #  Dynamically find nearest airports
     source_airport = find_nearest_airport(source_place)
     dest_airport = find_nearest_airport(destination_place)
 
-    # 🚗 Road 1: Source to Source Airport
+    #  Road 1: Source to Source Airport
     road1_km, road1_hr = get_road_distance(source_place, source_airport)
     road1_cost = road1_km * 5
     road1_emissions = road1_km * 0.15
 
-    # ✈️ Air: Between Airports
+    # Air: Between Airports
     src_lat, src_lng = get_lat_lng(source_airport)
     dst_lat, dst_lng = get_lat_lng(dest_airport)
     air_km = geodesic((src_lat, src_lng), (dst_lat, dst_lng)).km
@@ -83,12 +85,12 @@ def plan_air_route(source_place, destination_place):
     air_cost = 6 * air_km
     air_emissions = air_km * 0.125
 
-    # 🚗 Road 2: Destination Airport to Final Place
+    #  Road 2: Destination Airport to Final Place
     road2_km, road2_hr = get_road_distance(dest_airport, destination_place)
     road2_cost = road2_km * 5
     road2_emissions = road2_km * 0.15
 
-    # 📊 Build Output List
+    # Build Output List
     route = [
         {
             "mode": "road",
@@ -131,9 +133,9 @@ def plan_air_route(source_place, destination_place):
 def get_air_route(source, destination):
     return plan_air_route(source, destination)
 
-# 🧪 Run the planner
+#  Run the planner
 if __name__ == "__main__":
     src = input("Enter Source Address (e.g., Mangalore): ")
     dst = input("Enter Destination Address (e.g., Delhi): ")
     result = plan_air_route(src, dst)
-    pprint(result)
+    print(json.dumps(result, indent=2))

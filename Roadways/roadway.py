@@ -1,6 +1,9 @@
 import requests
 import time
 import math
+import sys
+sys.stdout.reconfigure(encoding='utf-8')
+
 
 # === Constants ===
 TRUCK_CAPACITY_KG = 10000  # assumed
@@ -128,7 +131,9 @@ def main():
     end_name = get_location_name(end_lat, end_lng)
     if end_name not in major_nodes:
         major_nodes.append(end_name)
-
+    LOADING_COST = 500
+    UNLOADING_COST = 500
+    LABOUR_COST = 1000
     output_segments = []
 
     for i in range(len(major_nodes) - 1):
@@ -156,7 +161,7 @@ def main():
         }
         output_segments.append(segment)
 
-    print("\n🚀 Final Optimized Output:")
+    print("\n Final Optimized Output:")
     import json
     print(json.dumps(output_segments, indent=2))
 
